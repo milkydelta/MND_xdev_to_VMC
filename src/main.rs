@@ -22,8 +22,6 @@ use std::net::{UdpSocket};
 use rosc::encoder;
 use rosc::{OscMessage, OscPacket, OscType};
 
-use maths_rs::prelude::*;
-
 
 pub fn main() {
     // Handle interrupts gracefully
@@ -43,17 +41,6 @@ pub fn main() {
     };
 
     let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
-
-
-    let m_conv = Mat4f::new(
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, -1.0, 0.0,
-    0.0, 0.0, 0.0, 1.0
-     );
-
-
-
 
 
     let xdev_ext = XR_MNDX_XDEV_SPACE_EXTENSION_NAME.as_bytes().to_vec();
@@ -300,46 +287,21 @@ pub fn main() {
                 if xd.can_create_space() {
                     let location = xd.create_space(xr::Posef::IDENTITY).unwrap().locate(&stage, xr_frame_state.predicted_display_time).unwrap();
 
-                    let loc = Mat4f::from_translation(vec3f(location.pose.position.x, location.pose.position.y, location.pose.position.z))
-                                        * Mat4f::from(Quatf::new(location.pose.orientation.x, location.pose.orientation.y, location.pose.orientation.z, location.pose.orientation.w));
-
-                    let unity_loc = m_conv * loc;
-
-                    let pos = Vec3f::from(unity_loc.get_column(3));
-                    let quat = quat_from_mat(unity_loc);
-
                     print!(
                         "{}: ({:0<12},{:0<12},{:0<12}), ",
-                        //xd.serial(),
-                        //pos.x,
-                        //pos.y,
-                        //pos.z
-                        location.pose.orientation.x,
-                        location.pose.orientation.y,
-                        location.pose.orientation.z,
-                        location.pose.orientation.w,
-
-                    );
-                    print!(
-                        "{}: ({:0<12},{:0<12},{:0<12}), ",
-                        //xd.serial(),
-                        //pos.x,
-                        //pos.y,
-                        //pos.z
-                        quat.x,
-                        quat.y,
-                        quat.z,
-                        quat.w,
-
+                        xd.serial(),
+                        location.pose.position.x,
+                        location.pose.position.y,
+                        location.pose.position.z
                     );
                     printed = true;
 
                     let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
                     addr: "/VMC/Ext/Tra/Pos".to_string(),
                     args: vec![OscType::String(xd.serial().to_string()), 
-                    OscType::Float(pos.x),
-                    OscType::Float(pos.y),
-                    OscType::Float(pos.z),
+                    OscType::Float(location.pose.position.x),
+                    OscType::Float(location.pose.position.y),
+                    OscType::Float(-location.pose.position.z),
                     OscType::Float(-location.pose.orientation.x),
                     OscType::Float(-location.pose.orientation.y),
                     OscType::Float(location.pose.orientation.z),
@@ -384,23 +346,6 @@ pub fn main() {
     println!("exiting cleanly");
 }
 
-
-fn quat_from_mat(mat:Mat4f) -> Quatf {
-    let m = Mat3f::from(mat);
-    let mut q = Quatf::default();
-
-    q.w = sqrt( max(0.0, 1.0 + m.m[0] + m.m[4] + m.m[8]) )/2.0;
-    q.x = sqrt( max(0.0, 1.0 + m.m[0] - m.m[4] - m.m[8]) )/2.0;
-    q.y = sqrt( max(0.0, 1.0 - m.m[0] + m.m[4] - m.m[8]) )/2.0;
-    q.z = sqrt( max(0.0, 1.0 - m.m[0] - m.m[4] + m.m[8]) )/2.0;
-
-    q.x =f32::copysign(q.x, m.get_row(2)[1] - m.get_row(1)[2]);
-    q.y =f32::copysign(q.y, m.get_row(0)[2] - m.get_row(2)[0]);
-    q.z =f32::copysign(q.z, m.get_row(1)[0] - m.get_row(0)[1]);
-
-    return q;    
-    
-}
 
 
 
