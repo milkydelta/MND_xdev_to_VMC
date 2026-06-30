@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 ctrlc = "3.5.2"
+maths-rs = "1.0.0"
 openxr = {version = "0.21.1", features = ["static"]}
 openxr_mndx_xdev_space = "0.2.0"
 rosc = "0.11.4"
