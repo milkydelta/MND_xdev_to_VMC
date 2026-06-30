@@ -17,6 +17,12 @@ use openxr::{self as xr, Posef};
 use openxr_mndx_xdev_space::SessionXDevExtensionMNDX;
 use openxr_mndx_xdev_space::XR_MNDX_XDEV_SPACE_EXTENSION_NAME;
 
+use std::net::{SocketAddrV4, UdpSocket};
+use std::str::FromStr;
+
+use rosc::encoder;
+use rosc::{OscMessage, OscPacket, OscType};
+
 
 pub fn main() {
     // Handle interrupts gracefully
@@ -35,9 +41,15 @@ pub fn main() {
             .expect("couldn't find the OpenXR loader; try enabling the \"static\" feature")
     };
 
+
+    let dest = SocketAddrV4::from_str("127.0.0.1:333").unwrap();
+    let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
+
+
+
+
+
     let xdev_ext = XR_MNDX_XDEV_SPACE_EXTENSION_NAME.as_bytes().to_vec();
-
-
     // OpenXR will fail to initialize if we ask for an extension that OpenXR can't provide! So we
     // need to check all our extensions before initializing OpenXR with them. Note that even if the
     // extension is present, it's still possible you may not be able to use it. For example: the
@@ -289,6 +301,22 @@ pub fn main() {
                         location.pose.position.z
                     );
                     printed = true;
+
+                    let mut msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+                    addr: "/VMC/Ext/Tra/Pos".to_string(),
+                    args: vec![OscType::String(xd.serial().to_string()), 
+                    OscType::Float(location.pose.position.x),
+                    OscType::Float(location.pose.position.y),
+                    OscType::Float(location.pose.position.z),
+                    OscType::Float(location.pose.orientation.x),
+                    OscType::Float(location.pose.orientation.y),
+                    OscType::Float(location.pose.orientation.z),
+                    OscType::Float(location.pose.orientation.w)],
+                    }))
+                    .unwrap();
+
+                    sock.send_to(&msg_buf, "127.0.0.1:3333").unwrap();
+
                 }
                 
             });
