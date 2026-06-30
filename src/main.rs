@@ -340,10 +340,10 @@ pub fn main() {
                     OscType::Float(pos.x),
                     OscType::Float(pos.y),
                     OscType::Float(pos.z),
-                    OscType::Float(quat.x),
-                    OscType::Float(quat.y),
-                    OscType::Float(quat.z),
-                    OscType::Float(quat.w)],
+                    OscType::Float(-location.pose.orientation.x),
+                    OscType::Float(-location.pose.orientation.y),
+                    OscType::Float(location.pose.orientation.z),
+                    OscType::Float(location.pose.orientation.w)],
                     }))
                     .unwrap();
 
