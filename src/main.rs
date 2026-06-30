@@ -13,9 +13,9 @@ use std::{
     time::Duration,
 };
 
-use openxr as xr;
-use openxr_mndx_xdev_space::InstanceXDevExtensionMNDX;
+use openxr::{self as xr, Posef};
 use openxr_mndx_xdev_space::SessionXDevExtensionMNDX;
+use openxr_mndx_xdev_space::XR_MNDX_XDEV_SPACE_EXTENSION_NAME;
 
 
 pub fn main() {
@@ -35,6 +35,9 @@ pub fn main() {
             .expect("couldn't find the OpenXR loader; try enabling the \"static\" feature")
     };
 
+    let xdev_ext = XR_MNDX_XDEV_SPACE_EXTENSION_NAME.as_bytes().to_vec();
+
+
     // OpenXR will fail to initialize if we ask for an extension that OpenXR can't provide! So we
     // need to check all our extensions before initializing OpenXR with them. Note that even if the
     // extension is present, it's still possible you may not be able to use it. For example: the
@@ -42,14 +45,29 @@ pub fn main() {
     // on. There are often additional checks that should be made before using certain features!
     let available_extensions = entry.enumerate_extensions().unwrap();
 
+    let mut has_xdev_extension = false;
+
+    for ext in available_extensions.other {
+        let ext_str = str::from_utf8(ext.as_slice()).unwrap();
+        if ext_str == XR_MNDX_XDEV_SPACE_EXTENSION_NAME {
+            has_xdev_extension = true;
+        }
+    }
+
+    
+
     // If a required extension isn't present, you want to ditch out here! It's possible something
     // like your rendering API might not be provided by the active runtime. APIs like OpenGL don't
     // have universal support.
     assert!(available_extensions.mnd_headless);
+    //assert!(has_xdev_extension);
 
     // Initialize OpenXR with the extensions we've found!
     let mut enabled_extensions = xr::ExtensionSet::default();
     enabled_extensions.mnd_headless = true;
+    enabled_extensions.other
+                .push(xdev_ext);
+
     #[cfg(target_os = "android")]
     {
         enabled_extensions.khr_android_create_instance = true;
@@ -229,44 +247,58 @@ pub fn main() {
 
             session.sync_actions(&[(&action_set).into()]).unwrap();
 
-            // Find where our controllers are located in the Stage space
-            let right_location = right_space
-                .locate(&stage, xr_frame_state.predicted_display_time)
-                .unwrap();
+            // // Find where our controllers are located in the Stage space
+            // let right_location = right_space
+            //     .locate(&stage, xr_frame_state.predicted_display_time)
+            //     .unwrap();
 
-            let left_location = left_space
-                .locate(&stage, xr_frame_state.predicted_display_time)
-                .unwrap();
+            // let left_location = left_space
+            //     .locate(&stage, xr_frame_state.predicted_display_time)
+            //     .unwrap();
 
             let mut printed = false;
-            if left_action.is_active(&session, xr::Path::NULL).unwrap() {
-                print!(
-                    "Left Hand: ({:0<12},{:0<12},{:0<12}), ",
-                    left_location.pose.position.x,
-                    left_location.pose.position.y,
-                    left_location.pose.position.z
-                );
-                printed = true;
-            }
+            // if left_action.is_active(&session, xr::Path::NULL).unwrap() {
+            //     print!(
+            //         "Left Hand: ({:0<12},{:0<12},{:0<12}), ",
+            //         left_location.pose.position.x,
+            //         left_location.pose.position.y,
+            //         left_location.pose.position.z
+            //     );
+            //     printed = true;
+            // }
 
-            if right_action.is_active(&session, xr::Path::NULL).unwrap() {
-                print!(
-                    "Right Hand: ({:0<12},{:0<12},{:0<12})",
-                    right_location.pose.position.x,
-                    right_location.pose.position.y,
-                    right_location.pose.position.z
-                );
-                printed = true;
-            }
+            // if right_action.is_active(&session, xr::Path::NULL).unwrap() {
+            //     print!(
+            //         "Right Hand: ({:0<12},{:0<12},{:0<12})",
+            //         right_location.pose.position.x,
+            //         right_location.pose.position.y,
+            //         right_location.pose.position.z
+            //     );
+            //     printed = true;
+            // }
+
+            session.get_xdev_list().unwrap().enumerate_xdevs().unwrap().into_iter().for_each(|xd| {
+                if xd.can_create_space() {
+                    let location = xd.create_space(xr::Posef::IDENTITY).unwrap().locate(&stage, xr_frame_state.predicted_display_time).unwrap();
+
+                    print!(
+                        "{}: ({:0<12},{:0<12},{:0<12}), ",
+                        xd.serial(),
+                        location.pose.position.x,
+                        location.pose.position.y,
+                        location.pose.position.z
+                    );
+                    printed = true;
+                }
+                
+            });
+
+
+
             if printed {
                 println!();
             }
 
-            // Fetch the view transforms. To minimize latency, we intentionally do this *after*
-            // recording commands to render the scene, i.e. at the last possible moment before
-            // rendering begins in earnest on the GPU. Uniforms dependent on this data can be sent
-            // to the GPU just-in-time by writing them to per-frame host-visible memory which the
-            // GPU will only read once the command buffer is submitted.
 
             std::thread::sleep(Duration::from_millis(1000/90));
             
