@@ -1,10 +1,3 @@
-//! Illustrates rendering using Vulkan with multiview. Supports any Vulkan 1.1 capable environment.
-//!
-//! Renders a smooth gradient across the entire view, with different colors per eye.
-//!
-//! This example uses minimal abstraction for clarity. Real-world code should encapsulate and
-//! largely decouple its Vulkan and OpenXR components and handle errors gracefully.
-
 use std::{
     sync::{
         Arc,
@@ -23,6 +16,8 @@ use rosc::encoder;
 use rosc::{OscMessage, OscPacket, OscType};
 
 use std::time::{SystemTime};
+
+use std::env;
 
 struct TrackedThing{
     name: String,
@@ -47,6 +42,20 @@ pub fn main() {
             .expect("couldn't find the OpenXR loader; try enabling the \"static\" feature")
     };
 
+    let mut port = "27769".to_owned();
+    // Handle command-line args
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 {
+        for i in 1..args.len() {
+            if args[i] == "-port" && i < args.len()-1{
+                println!("PORT: {}", args[i+1]);
+                port = args[i+1].clone();
+            }
+        }
+    }
+
+    let osc_dest = "127.0.0.1:".to_owned() + &port;
+    println!("DEST {}", osc_dest);
 
 
     let xdev_ext = XR_MNDX_XDEV_SPACE_EXTENSION_NAME.as_bytes().to_vec();
@@ -56,16 +65,6 @@ pub fn main() {
     // hand tracking extension may be present, but the hand sensor might not be plugged in or turned
     // on. There are often additional checks that should be made before using certain features!
     let available_extensions = entry.enumerate_extensions().unwrap();
-
-    let mut has_xdev_extension = false;
-
-    for ext in available_extensions.other {
-        let ext_str = str::from_utf8(ext.as_slice()).unwrap();
-        if ext_str == XR_MNDX_XDEV_SPACE_EXTENSION_NAME {
-            has_xdev_extension = true;
-        }
-    }
-
     
 
     // If a required extension isn't present, you want to ditch out here! It's possible something
@@ -180,7 +179,6 @@ pub fn main() {
                     println!("XDev - Name: {}, Serial: {}", xd.name(), xd.serial())
                 }
             });
-
 
 
 
@@ -300,7 +298,7 @@ pub fn main() {
                     }))
                     .unwrap();
 
-                    sock.send_to(&msg_buf, "127.0.0.1:27769").unwrap();
+                    sock.send_to(&msg_buf, &osc_dest).unwrap();
             });
 
             let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
@@ -308,7 +306,7 @@ pub fn main() {
                     args: vec![OscType::Float(SystemTime::now().duration_since(starting_time).expect("Time thing").as_secs_f32())],}))
                     .unwrap();
 
-            sock.send_to(&msg_buf, "127.0.0.1:27769").unwrap();
+            sock.send_to(&msg_buf, &osc_dest).unwrap();
 
 
             std::thread::sleep(Duration::from_millis(1000/90));
