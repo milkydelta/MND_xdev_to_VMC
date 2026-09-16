@@ -121,55 +121,55 @@ pub fn main() {
             )
             .unwrap();
 
-        // Create an action set to encapsulate our actions
-        let action_set = xr_instance
-            .create_action_set("input", "input pose information", 0)
-            .unwrap();
+        // // Create an action set to encapsulate our actions
+        // let action_set = xr_instance
+        //     .create_action_set("input", "input pose information", 0)
+        //     .unwrap();
 
-        let right_action = action_set
-            .create_action::<xr::Posef>("right_hand", "Right Hand Controller", &[])
-            .unwrap();
-        let left_action = action_set
-            .create_action::<xr::Posef>("left_hand", "Left Hand Controller", &[])
-            .unwrap();
+        // let right_action = action_set
+        //     .create_action::<xr::Posef>("right_hand", "Right Hand Controller", &[])
+        //     .unwrap();
+        // let left_action = action_set
+        //     .create_action::<xr::Posef>("left_hand", "Left Hand Controller", &[])
+        //     .unwrap();
 
-        // Bind our actions to input devices using the given profile
-        // If you want to access inputs specific to a particular device you may specify a different
-        // interaction profile
-        xr_instance
-            .suggest_interaction_profile_bindings(
-                xr_instance
-                    .string_to_path("/interaction_profiles/khr/simple_controller")
-                    .unwrap(),
-                &[
-                    xr::Binding::new(
-                        &right_action,
-                        xr_instance
-                            .string_to_path("/user/hand/right/input/grip/pose")
-                            .unwrap(),
-                    ),
-                    xr::Binding::new(
-                        &left_action,
-                        xr_instance
-                            .string_to_path("/user/hand/left/input/grip/pose")
-                            .unwrap(),
-                    ),
-                ],
-            )
-            .unwrap();
+        // // Bind our actions to input devices using the given profile
+        // // If you want to access inputs specific to a particular device you may specify a different
+        // // interaction profile
+        // xr_instance
+        //     .suggest_interaction_profile_bindings(
+        //         xr_instance
+        //             .string_to_path("/interaction_profiles/khr/simple_controller")
+        //             .unwrap(),
+        //         &[
+        //             xr::Binding::new(
+        //                 &right_action,
+        //                 xr_instance
+        //                     .string_to_path("/user/hand/right/input/grip/pose")
+        //                     .unwrap(),
+        //             ),
+        //             xr::Binding::new(
+        //                 &left_action,
+        //                 xr_instance
+        //                     .string_to_path("/user/hand/left/input/grip/pose")
+        //                     .unwrap(),
+        //             ),
+        //         ],
+        //     )
+        //     .unwrap();
 
-        // Attach the action set to the session
-        session.attach_action_sets(&[&action_set]).unwrap();
+        // // Attach the action set to the session
+        // session.attach_action_sets(&[&action_set]).unwrap();
 
 
         let mut things:Vec<TrackedThing> = Vec::new();
-        // Create an action space for each device we want to locate
-        let right_space = right_action
-            .create_space(&session, xr::Path::NULL, xr::Posef::IDENTITY)
-            .unwrap();
-        let left_space = left_action
-            .create_space(&session, xr::Path::NULL, xr::Posef::IDENTITY)
-            .unwrap();
+        // // Create an action space for each device we want to locate
+        // let right_space = right_action
+        //     .create_space(&session, xr::Path::NULL, xr::Posef::IDENTITY)
+        //     .unwrap();
+        // let left_space = left_action
+        //     .create_space(&session, xr::Path::NULL, xr::Posef::IDENTITY)
+        //     .unwrap();
 
         session.get_xdev_list().unwrap().enumerate_xdevs().unwrap().into_iter().for_each(|xd| {
                 if xd.can_create_space() {
@@ -253,7 +253,7 @@ pub fn main() {
             // // predicting locations of controllers, viewpoints, etc.
             let xr_frame_state = frame_wait.wait().unwrap();            
 
-            session.sync_actions(&[(&action_set).into()]).unwrap();
+            //session.sync_actions(&[(&action_set).into()]).unwrap();
 
             // // Find where our controllers are located in the Stage space
             // let right_location = right_space
@@ -323,11 +323,11 @@ pub fn main() {
             frame_wait,
             frame_stream,
             stage,
-            action_set,
-            left_space,
-            right_space,
-            left_action,
-            right_action,
+            // action_set,
+            // left_space,
+            // right_space,
+            // left_action,
+            // right_action,
         ));
 
     }
