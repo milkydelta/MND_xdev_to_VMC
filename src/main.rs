@@ -24,6 +24,11 @@ use rosc::{OscMessage, OscPacket, OscType};
 
 use std::time::{SystemTime};
 
+struct TrackedThing{
+    name: String,
+    space: xr::Space,
+}
+
 
 pub fn main() {
     // Handle interrupts gracefully
@@ -42,7 +47,6 @@ pub fn main() {
             .expect("couldn't find the OpenXR loader; try enabling the \"static\" feature")
     };
 
-    let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
 
 
     let xdev_ext = XR_MNDX_XDEV_SPACE_EXTENSION_NAME.as_bytes().to_vec();
@@ -76,14 +80,11 @@ pub fn main() {
     enabled_extensions.other
                 .push(xdev_ext);
 
-    #[cfg(target_os = "android")]
-    {
-        enabled_extensions.khr_android_create_instance = true;
-    }
+    
     let xr_instance = entry
         .create_instance(
             &xr::ApplicationInfo {
-                application_name: "openxrs example",
+                application_name: "XDev-to-Nyan",
                 application_version: 0,
                 engine_name: "openxrs example",
                 engine_version: 0,
@@ -103,9 +104,9 @@ pub fn main() {
     let system = xr_instance
         .system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)
         .unwrap();
-    // OpenXR wants to ensure apps are using the correct graphics card and Vulkan features and
-    // extensions, so the instance and device MUST be set up before Instance::create_session.
 
+
+    let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
     let starting_time = SystemTime::now();
 
 
@@ -161,6 +162,8 @@ pub fn main() {
         // Attach the action set to the session
         session.attach_action_sets(&[&action_set]).unwrap();
 
+
+        let mut things:Vec<TrackedThing> = Vec::new();
         // Create an action space for each device we want to locate
         let right_space = right_action
             .create_space(&session, xr::Path::NULL, xr::Posef::IDENTITY)
@@ -168,6 +171,18 @@ pub fn main() {
         let left_space = left_action
             .create_space(&session, xr::Path::NULL, xr::Posef::IDENTITY)
             .unwrap();
+
+        session.get_xdev_list().unwrap().enumerate_xdevs().unwrap().into_iter().for_each(|xd| {
+                if xd.can_create_space() {
+                    let spac = xd.create_space(xr::Posef::IDENTITY).unwrap();
+
+                    things.push(TrackedThing{ name: xd.serial().to_string(), space: spac});
+                    println!("XDev - Name: {}, Serial: {}", xd.name(), xd.serial())
+                }
+            });
+
+
+
 
         // OpenXR uses a couple different types of reference frames for positioning content; we need
         // to choose one for displaying our content! STAGE would be relative to the center of your
@@ -238,20 +253,7 @@ pub fn main() {
             // // Block until the previous frame is finished displaying, and is ready for another one.
             // // Also returns a prediction of when the next frame will be displayed, for use with
             // // predicting locations of controllers, viewpoints, etc.
-            let xr_frame_state = frame_wait.wait().unwrap();
-            // // Must be called before any rendering is done!
-            // frame_stream.begin().unwrap();
-
-            // if !xr_frame_state.should_render {
-            //     frame_stream
-            //         .end(
-            //             xr_frame_state.predicted_display_time,
-            //             environment_blend_mode,
-            //             &[],
-            //         )
-            //         .unwrap();
-            //     continue;
-            // }
+            let xr_frame_state = frame_wait.wait().unwrap();            
 
             session.sync_actions(&[(&action_set).into()]).unwrap();
 
@@ -264,7 +266,6 @@ pub fn main() {
             //     .locate(&stage, xr_frame_state.predicted_display_time)
             //     .unwrap();
 
-            let mut printed = false;
             // if left_action.is_active(&session, xr::Path::NULL).unwrap() {
             //     print!(
             //         "Left Hand: ({:0<12},{:0<12},{:0<12}), ",
@@ -272,7 +273,6 @@ pub fn main() {
             //         left_location.pose.position.y,
             //         left_location.pose.position.z
             //     );
-            //     printed = true;
             // }
 
             // if right_action.is_active(&session, xr::Path::NULL).unwrap() {
@@ -282,25 +282,14 @@ pub fn main() {
             //         right_location.pose.position.y,
             //         right_location.pose.position.z
             //     );
-            //     printed = true;
             // }
 
-            session.get_xdev_list().unwrap().enumerate_xdevs().unwrap().into_iter().for_each(|xd| {
-                if xd.can_create_space() {
-                    let location = xd.create_space(xr::Posef::IDENTITY).unwrap().locate(&stage, xr_frame_state.predicted_display_time).unwrap();
+            things.iter().for_each(|thing| {
+                let location = thing.space.locate(&stage, xr_frame_state.predicted_display_time).unwrap();
 
-                    //print!(
-                    //    "{}: ({:0<12},{:0<12},{:0<12}), ",
-                    //    xd.serial(),
-                    //    location.pose.position.x,
-                    //    location.pose.position.y,
-                    //    location.pose.position.z
-                    //);
-                    //printed = true;
-
-                    let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+                let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
                     addr: "/vnyan/tracker/pos".to_string(),
-                    args: vec![OscType::String(xd.serial().to_string()), 
+                    args: vec![OscType::String(thing.name.clone()), 
                     OscType::Float(location.pose.position.x),
                     OscType::Float(location.pose.position.y),
                     OscType::Float(-location.pose.position.z),
@@ -312,10 +301,8 @@ pub fn main() {
                     .unwrap();
 
                     sock.send_to(&msg_buf, "127.0.0.1:27769").unwrap();
-
-                }
-                
             });
+
             let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
                     addr: "/vnyan/timestamp".to_string(),
                     args: vec![OscType::Float(SystemTime::now().duration_since(starting_time).expect("Time thing").as_secs_f32())],}))
@@ -324,18 +311,13 @@ pub fn main() {
             sock.send_to(&msg_buf, "127.0.0.1:27769").unwrap();
 
 
-
-
-            if printed {
-                println!();
-            }
-
-
             std::thread::sleep(Duration::from_millis(1000/90));
             
             frame = (frame + 1) % PIPELINE_DEPTH as usize;
         }
 
+
+        
         // OpenXR MUST be allowed to clean up before we destroy Vulkan resources it could touch, so
         // first we must drop all its handles.
         drop((
@@ -354,8 +336,6 @@ pub fn main() {
 
     println!("exiting cleanly");
 }
-
-
 
 
 pub const VIEW_COUNT: u32 = 2;
