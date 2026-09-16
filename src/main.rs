@@ -22,6 +22,8 @@ use std::net::{UdpSocket};
 use rosc::encoder;
 use rosc::{OscMessage, OscPacket, OscType};
 
+use std::time::{SystemTime};
+
 
 pub fn main() {
     // Handle interrupts gracefully
@@ -104,7 +106,7 @@ pub fn main() {
     // OpenXR wants to ensure apps are using the correct graphics card and Vulkan features and
     // extensions, so the instance and device MUST be set up before Instance::create_session.
 
-
+    let starting_time = SystemTime::now();
 
 
     #[allow(clippy::missing_transmute_annotations)]
@@ -287,17 +289,17 @@ pub fn main() {
                 if xd.can_create_space() {
                     let location = xd.create_space(xr::Posef::IDENTITY).unwrap().locate(&stage, xr_frame_state.predicted_display_time).unwrap();
 
-                    print!(
-                        "{}: ({:0<12},{:0<12},{:0<12}), ",
-                        xd.serial(),
-                        location.pose.position.x,
-                        location.pose.position.y,
-                        location.pose.position.z
-                    );
-                    printed = true;
+                    //print!(
+                    //    "{}: ({:0<12},{:0<12},{:0<12}), ",
+                    //    xd.serial(),
+                    //    location.pose.position.x,
+                    //    location.pose.position.y,
+                    //    location.pose.position.z
+                    //);
+                    //printed = true;
 
                     let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
-                    addr: "/VMC/Ext/Tra/Pos".to_string(),
+                    addr: "/vnyan/tracker/pos".to_string(),
                     args: vec![OscType::String(xd.serial().to_string()), 
                     OscType::Float(location.pose.position.x),
                     OscType::Float(location.pose.position.y),
@@ -309,11 +311,18 @@ pub fn main() {
                     }))
                     .unwrap();
 
-                    sock.send_to(&msg_buf, "127.0.0.1:3333").unwrap();
+                    sock.send_to(&msg_buf, "127.0.0.1:27769").unwrap();
 
                 }
                 
             });
+            let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+                    addr: "/vnyan/timestamp".to_string(),
+                    args: vec![OscType::Float(SystemTime::now().duration_since(starting_time).expect("Time thing").as_secs_f32())],}))
+                    .unwrap();
+
+            sock.send_to(&msg_buf, "127.0.0.1:27769").unwrap();
+
 
 
 
