@@ -2,8 +2,7 @@ use std::{
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
+    }, time::Duration, vec,
 };
 
 use openxr::{self as xr};
@@ -12,8 +11,7 @@ use openxr_mndx_xdev_space::XR_MNDX_XDEV_SPACE_EXTENSION_NAME;
 
 use std::net::{UdpSocket};
 
-use rosc::encoder;
-use rosc::{OscMessage, OscPacket, OscType};
+use rosc::{OscTime, encoder, OscMessage, OscPacket, OscType, OscBundle};
 
 use std::time::{SystemTime};
 
@@ -66,13 +64,11 @@ pub fn main() {
     // hand tracking extension may be present, but the hand sensor might not be plugged in or turned
     // on. There are often additional checks that should be made before using certain features!
     let available_extensions = entry.enumerate_extensions().unwrap();
-    
 
     // If a required extension isn't present, you want to ditch out here! It's possible something
     // like your rendering API might not be provided by the active runtime. APIs like OpenGL don't
     // have universal support.
     assert!(available_extensions.mnd_headless);
-    //assert!(has_xdev_extension);
 
     // Initialize OpenXR with the extensions we've found!
     let mut enabled_extensions = xr::ExtensionSet::default();
@@ -283,10 +279,12 @@ pub fn main() {
             //     );
             // }
 
+            let mut cont: Vec<OscPacket> = Vec::new();
+
             things.iter().for_each(|thing| {
                 let location = thing.space.locate(&stage, xr_frame_state.predicted_display_time).unwrap();
 
-                let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+                cont.push(OscPacket::Message(OscMessage {
                     addr: "/vnyan/tracker/pos".to_string(),
                     args: vec![OscType::String(thing.name.clone()), 
                     OscType::Float(location.pose.position.x),
@@ -296,15 +294,17 @@ pub fn main() {
                     OscType::Float(-location.pose.orientation.y),
                     OscType::Float(location.pose.orientation.z),
                     OscType::Float(location.pose.orientation.w)],
-                    }))
-                    .unwrap();
-
-                    sock.send_to(&msg_buf, &osc_dest).unwrap();
+                    }));
             });
 
-            let msg_buf = encoder::encode(&OscPacket::Message(OscMessage {
+            cont.push(OscPacket::Message(OscMessage {
                     addr: "/vnyan/timestamp".to_string(),
-                    args: vec![OscType::Float(SystemTime::now().duration_since(starting_time).expect("Time thing").as_secs_f32())],}))
+                    args: vec![OscType::Float(SystemTime::now().duration_since(starting_time).expect("Time thing").as_secs_f32())],})
+            );
+
+            let bundle:OscBundle =OscBundle { timetag: OscTime { seconds: (0), fractional: (0) }, content: (cont) };
+
+            let msg_buf = encoder::encode(&OscPacket::Bundle(bundle))
                     .unwrap();
 
             sock.send_to(&msg_buf, &osc_dest).unwrap();
